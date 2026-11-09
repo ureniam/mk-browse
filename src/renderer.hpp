@@ -1,9 +1,7 @@
 #pragma once
 #include "layout.hpp"
+#include "gfx_canvas.hpp"
 #include <cairo.h>
-#include <gdk-pixbuf/gdk-pixbuf.h>
-#include <string>
-#include <unordered_map>
 
 class Renderer {
 public:
@@ -12,7 +10,8 @@ public:
         const std::shared_ptr<LayoutBox>& rootBox, 
         double scrollY, 
         double viewportWidth, 
-        double viewportHeight
+        double viewportHeight,
+        GfxCanvas::PixmapCache& cache
     );
 
 private:
@@ -22,6 +21,8 @@ private:
         double scrollY, 
         double viewportWidth, 
         double viewportHeight,
-        PangoLayout* pangoLayout
+        PangoLayout* pangoLayout,
+        GfxCanvas::PixmapCache& cache,
+        int depth = 0
     );
 };

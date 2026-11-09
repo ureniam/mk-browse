@@ -1,7 +1,6 @@
 #include "browser_tab.hpp"
 #include "html_parser.hpp"
 #include "renderer.hpp"
-#include <iostream>
 
 BrowserTab::BrowserTab(const std::string& initialUrl) {
     setupUi();
@@ -22,6 +21,9 @@ void BrowserTab::setupUi() {
         GDK_SCROLL_MASK | 
         GDK_LEAVE_NOTIFY_MASK
     );
+
+    // Initialize GfxCanvas for this tab
+    canvas = std::make_unique<GfxCanvas>(drawingArea, 40 * 1024 * 1024);
 
     gtk_box_pack_start(GTK_BOX(containerWidget), drawingArea, TRUE, TRUE, 0);
 
@@ -53,7 +55,6 @@ void BrowserTab::loadUrl(const std::string& url, bool isHistoryNav) {
     rawHtml = lastResponse.body;
 
     if (!isHistoryNav) {
-        // Truncate forward history if navigating new URL
         if (historyIndex >= 0 && historyIndex + 1 < static_cast<int>(history.size())) {
             history.erase(history.begin() + historyIndex + 1, history.end());
         }
@@ -126,22 +127,22 @@ void BrowserTab::relayout() {
 }
 
 gboolean BrowserTab::onDraw(GtkWidget* widget, cairo_t* cr, gpointer userData) {
+    (void)widget;
     BrowserTab* tab = static_cast<BrowserTab*>(userData);
-    Renderer::render(cr, tab->layoutRoot, tab->scrollY, tab->viewportWidth, tab->viewportHeight);
+    Renderer::render(cr, tab->layoutRoot, tab->scrollY, tab->viewportWidth, tab->viewportHeight, tab->canvas->cache());
     return FALSE;
 }
 
 gboolean BrowserTab::onButtonPress(GtkWidget* widget, GdkEventButton* event, gpointer userData) {
+    (void)widget;
     BrowserTab* tab = static_cast<BrowserTab*>(userData);
     if (event->button == GDK_BUTTON_PRIMARY && tab->layoutRoot) {
         double clickX = event->x;
         double clickY = event->y + tab->scrollY;
         std::string targetLink = tab->layoutRoot->findLinkAt(clickX, clickY);
         if (!targetLink.empty()) {
-            // Handle relative URLs
             if (targetLink.find("://") == std::string::npos && targetLink.rfind("about:", 0) != 0) {
                 if (targetLink[0] == '/') {
-                    // Extract domain
                     size_t slashSlash = tab->currentUrl.find("://");
                     if (slashSlash != std::string::npos) {
                         size_t firstPathSlash = tab->currentUrl.find('/', slashSlash + 3);
@@ -192,6 +193,7 @@ gboolean BrowserTab::onMotionNotify(GtkWidget* widget, GdkEventMotion* event, gp
 }
 
 gboolean BrowserTab::onScroll(GtkWidget* widget, GdkEventScroll* event, gpointer userData) {
+    (void)widget;
     BrowserTab* tab = static_cast<BrowserTab*>(userData);
     double delta = 40.0;
     if (event->direction == GDK_SCROLL_UP) {
@@ -206,6 +208,7 @@ gboolean BrowserTab::onScroll(GtkWidget* widget, GdkEventScroll* event, gpointer
 }
 
 void BrowserTab::onSizeAllocate(GtkWidget* widget, GtkAllocation* allocation, gpointer userData) {
+    (void)widget;
     BrowserTab* tab = static_cast<BrowserTab*>(userData);
     if (tab->viewportWidth != allocation->width || tab->viewportHeight != allocation->height) {
         tab->viewportWidth = allocation->width;

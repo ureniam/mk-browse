@@ -60,7 +60,7 @@ std::shared_ptr<LayoutBox> LayoutEngine::layout(
     double startX = 20.0;
 
     for (const auto& child : root->children) {
-        layoutNode(child, defaultStyle, currentX, currentY, availableWidth, startX, rootBox, cr, pangoLayout);
+        layoutNode(child, defaultStyle, currentX, currentY, availableWidth, startX, rootBox, cr, pangoLayout, 0);
     }
 
     g_object_unref(pangoLayout);
@@ -79,13 +79,13 @@ void LayoutEngine::layoutNode(
     double startX,
     std::shared_ptr<LayoutBox> parentBox,
     cairo_t* cr,
-    PangoLayout* pangoLayout
+    PangoLayout* pangoLayout,
+    int depth
 ) {
-    if (!node) return;
+    if (!node || depth > 256) return; // Prevent stack overflow on deeply nested elements
 
     if (node->type == NodeType::TEXT) {
         std::string raw = node->textContent;
-        // Break into words
         std::istringstream stream(raw);
         std::string word;
         
@@ -97,7 +97,6 @@ void LayoutEngine::layoutNode(
             measureWord(pangoLayout, " ", parentStyle, spaceW, spaceH);
 
             if (currentX + wordW > startX + availableWidth && currentX > startX) {
-                // Wrap to next line
                 currentX = startX;
                 currentY += wordH + 3.0;
             }
@@ -183,7 +182,6 @@ void LayoutEngine::layoutNode(
 
     // Block container elements
     bool isBlock = (style.display == DisplayType::BLOCK);
-    double savedY = currentY;
 
     if (isBlock) {
         if (currentX > startX) {
@@ -208,9 +206,9 @@ void LayoutEngine::layoutNode(
         parentBox->addChild(bulletBox);
     }
 
-    // Layout all children
+    // Layout all children with incremented depth
     for (const auto& child : node->children) {
-        layoutNode(child, style, currentX, currentY, availableWidth, startX, parentBox, cr, pangoLayout);
+        layoutNode(child, style, currentX, currentY, availableWidth, startX, parentBox, cr, pangoLayout, depth + 1);
     }
 
     if (isBlock) {

@@ -1,6 +1,7 @@
 # Build outputs
 *.o
 mk-browse
+tests/stress_test
 build/
 dist/
 

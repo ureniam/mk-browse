@@ -36,6 +36,14 @@ std::string NetworkEngine::normalizeUrl(const std::string& input) {
 
     // If it has spaces or no dot, treat as search query
     if (trimmed.find(' ') != std::string::npos || trimmed.find('.') == std::string::npos) {
+        CURL* curl = curl_easy_init();
+        if (curl) {
+            char* escaped = curl_easy_escape(curl, trimmed.c_str(), static_cast<int>(trimmed.length()));
+            std::string q = escaped ? std::string(escaped) : trimmed;
+            if (escaped) curl_free(escaped);
+            curl_easy_cleanup(curl);
+            return "https://html.duckduckgo.com/html/?q=" + q;
+        }
         return "https://html.duckduckgo.com/html/?q=" + trimmed;
     }
 

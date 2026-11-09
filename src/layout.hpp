@@ -70,6 +70,7 @@ private:
         double startX,
         std::shared_ptr<LayoutBox> parentBox,
         cairo_t* cr,
-        PangoLayout* pangoLayout
+        PangoLayout* pangoLayout,
+        int depth
     );
 };

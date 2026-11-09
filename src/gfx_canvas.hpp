@@ -12,6 +12,7 @@
 /**
  * GfxCanvas - Double-buffered Cairo rendering canvas with bounded LRU image cache.
  * Designed for low-RAM devices (50-100MB budget).
+ * Supports both local file paths and remote HTTP/HTTPS image URLs.
  */
 class GfxCanvas {
 public:
@@ -20,7 +21,7 @@ public:
         explicit PixmapCache(size_t maxBytes = 40 * 1024 * 1024); // 40 MB max image cache
         ~PixmapCache();
 
-        GdkPixbuf* get(const std::string& path, int targetWidth, int targetHeight);
+        GdkPixbuf* get(const std::string& pathOrUrl, int targetWidth, int targetHeight);
         size_t usedBytes() const { return usedBytes_; }
 
     private:
@@ -36,22 +37,16 @@ public:
         std::mutex mtx_;
 
         void evictUntilFits(size_t needed);
+        GdkPixbuf* downloadAndDecode(const std::string& url, int targetWidth, int targetHeight);
     };
 
     explicit GfxCanvas(GtkWidget* drawingArea, size_t cacheMaxBytes = 40 * 1024 * 1024);
     ~GfxCanvas();
 
     PixmapCache& cache() { return cache_; }
-    void ensureSurfaces(int w, int h);
-    void resize(int w, int h);
+    GtkWidget* getWidget() const { return drawingArea_; }
 
 private:
     GtkWidget* drawingArea_ = nullptr;
     PixmapCache cache_;
-    cairo_surface_t* front_ = nullptr;
-    cairo_surface_t* back_ = nullptr;
-    cairo_t* crBack_ = nullptr;
-    int width_ = 0;
-    int height_ = 0;
-    std::mutex drawMtx_;
 };

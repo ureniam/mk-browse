@@ -2,6 +2,7 @@
 #include "dom.hpp"
 #include "layout.hpp"
 #include "network.hpp"
+#include "gfx_canvas.hpp"
 #include <gtk/gtk.h>
 #include <string>
 #include <vector>
@@ -33,6 +34,8 @@ public:
     GtkWidget* vScrollbar = nullptr;
     GtkAdjustment* vAdjustment = nullptr;
     GtkWidget* tabLabelWidget = nullptr;
+
+    std::unique_ptr<GfxCanvas> canvas;
 
     std::function<void(const std::string& url)> onNavigateCallback;
     std::function<void(const std::string& title)> onTitleChangeCallback;

@@ -11,9 +11,10 @@ void Renderer::render(
     const std::shared_ptr<LayoutBox>& rootBox, 
     double scrollY, 
     double viewportWidth, 
-    double viewportHeight
+    double viewportHeight,
+    GfxCanvas::PixmapCache& cache
 ) {
-    // Fill background with clean white / theme background
+    // Fill background with clean white
     cairo_set_source_rgb(cr, 1.0, 1.0, 1.0);
     cairo_paint(cr);
 
@@ -21,8 +22,8 @@ void Renderer::render(
 
     PangoLayout* pangoLayout = pango_cairo_create_layout(cr);
 
-    // Render tree with scroll offset
-    renderBox(cr, rootBox, scrollY, viewportWidth, viewportHeight, pangoLayout);
+    // Render tree with scroll offset and image cache
+    renderBox(cr, rootBox, scrollY, viewportWidth, viewportHeight, pangoLayout, cache);
 
     g_object_unref(pangoLayout);
 }
@@ -33,9 +34,11 @@ void Renderer::renderBox(
     double scrollY, 
     double viewportWidth, 
     double viewportHeight,
-    PangoLayout* pangoLayout
+    PangoLayout* pangoLayout,
+    GfxCanvas::PixmapCache& cache,
+    int depth
 ) {
-    if (!box) return;
+    if (!box || depth > 256) return;
 
     double drawY = box->y - scrollY;
 
@@ -67,22 +70,17 @@ void Renderer::renderBox(
             cairo_stroke(cr);
         }
 
-        // 4. Draw Image
+        // 4. Draw Image (Local or Web URL cached through GfxCanvas::PixmapCache)
         if (box->type == BoxType::IMAGE && !box->imageSrc.empty()) {
-            GError* err = nullptr;
-            GdkPixbuf* pixbuf = gdk_pixbuf_new_from_file_at_scale(
-                box->imageSrc.c_str(), 
+            GdkPixbuf* pixbuf = cache.get(
+                box->imageSrc, 
                 static_cast<int>(box->width), 
-                static_cast<int>(box->height), 
-                TRUE, 
-                &err
+                static_cast<int>(box->height)
             );
             if (pixbuf) {
                 gdk_cairo_set_source_pixbuf(cr, pixbuf, box->x, drawY);
                 cairo_paint(cr);
-                g_object_unref(pixbuf);
             } else {
-                if (err) g_error_free(err);
                 // Draw fallback placeholder
                 cairo_set_source_rgb(cr, 0.9, 0.92, 0.95);
                 cairo_rectangle(cr, box->x, drawY, box->width, box->height);
@@ -129,6 +127,6 @@ void Renderer::renderBox(
 
     // Recursively render children
     for (const auto& child : box->children) {
-        renderBox(cr, child, scrollY, viewportWidth, viewportHeight, pangoLayout);
+        renderBox(cr, child, scrollY, viewportWidth, viewportHeight, pangoLayout, cache, depth + 1);
     }
 }

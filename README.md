@@ -61,6 +61,13 @@ make -j$(nproc)
 ```bash
 make test
 ```
+The automated test suite runs:
+- **20,000 Nested Divs Stress Test:** Recursion safety & DOM/Layout depth guard verification.
+- **Broken & Malformed HTML Fuzzer:** Unclosed tags, wild angles, and attribute edge cases.
+- **5,000 Words Page Layout & Flow:** High-volume word layout and wrapping metrics.
+- **Multi-Word Search Encoding:** DuckDuckGo query escape verification via `curl_easy_escape`.
+- **PixmapCache 40MB LRU Budget:** Image cache eviction and memory safety bounds.
+- **Headless Page & Real Web Fetch Verification:** Validates `about:home`, `about:mkcorpo`, and `https://news.ycombinator.com`.
 
 ### Launching on Desktop
 ```bash

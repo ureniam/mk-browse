@@ -77,14 +77,18 @@ std::shared_ptr<DOMNode> HTMLParser::parse(const std::string& html) {
         "link", "meta", "param", "source", "track", "wbr"
     };
 
+    // Robustness safeguards against pathological inputs (e.g. 20,000 nested tags)
+    const size_t MAX_DOM_DEPTH = 256;
+    const size_t MAX_TOTAL_NODES = 50000;
+    size_t totalNodes = 0;
+
     size_t pos = 0;
     const size_t len = html.size();
 
-    while (pos < len) {
+    while (pos < len && totalNodes < MAX_TOTAL_NODES) {
         // Find next tag
         size_t tagStart = html.find('<', pos);
         if (tagStart == std::string::npos) {
-            // Remainder is text
             std::string text = html.substr(pos);
             text = decodeEntities(text);
             if (!trim(text).empty() || (text.find(' ') != std::string::npos)) {
@@ -92,6 +96,7 @@ std::shared_ptr<DOMNode> HTMLParser::parse(const std::string& html) {
                 textNode->textContent = text;
                 textNode->parent = nodeStack.top();
                 nodeStack.top()->addChild(textNode);
+                totalNodes++;
             }
             break;
         }
@@ -105,6 +110,7 @@ std::shared_ptr<DOMNode> HTMLParser::parse(const std::string& html) {
                 textNode->textContent = text;
                 textNode->parent = nodeStack.top();
                 nodeStack.top()->addChild(textNode);
+                totalNodes++;
             }
         }
 
@@ -112,7 +118,7 @@ std::shared_ptr<DOMNode> HTMLParser::parse(const std::string& html) {
         if (tagStart + 3 < len && html.substr(tagStart, 4) == "<!--") {
             size_t commentEnd = html.find("-->", tagStart + 4);
             if (commentEnd == std::string::npos) {
-                pos = len; // Unterminated comment
+                pos = len;
             } else {
                 pos = commentEnd + 3;
             }
@@ -139,7 +145,6 @@ std::shared_ptr<DOMNode> HTMLParser::parse(const std::string& html) {
         // Check for closing tag </tag>
         if (tagContent[0] == '/') {
             std::string closingTag = toLower(trim(tagContent.substr(1)));
-            // Unwind stack until matching tag or root
             std::stack<std::shared_ptr<DOMNode>> temp;
             bool found = false;
             while (nodeStack.size() > 1) {
@@ -152,7 +157,6 @@ std::shared_ptr<DOMNode> HTMLParser::parse(const std::string& html) {
                 nodeStack.pop();
             }
             if (!found) {
-                // Restore stack if tag not found
                 while (!temp.empty()) {
                     nodeStack.push(temp.top());
                     temp.pop();
@@ -161,14 +165,12 @@ std::shared_ptr<DOMNode> HTMLParser::parse(const std::string& html) {
             continue;
         }
 
-        // It is an opening or self-closing tag
         bool selfClosing = false;
         if (!tagContent.empty() && tagContent.back() == '/') {
             selfClosing = true;
             tagContent.pop_back();
         }
 
-        // Parse tag name and attributes
         std::istringstream iss(tagContent);
         std::string tagName;
         iss >> tagName;
@@ -176,8 +178,9 @@ std::shared_ptr<DOMNode> HTMLParser::parse(const std::string& html) {
         if (tagName.empty()) continue;
 
         auto elem = std::make_shared<DOMNode>(NodeType::ELEMENT, tagName);
+        totalNodes++;
 
-        // Parse attributes: key="value" or key='value' or key=value or bare key
+        // Parse attributes
         std::string attrRemainder;
         std::getline(iss, attrRemainder);
         size_t aPos = 0;
@@ -202,12 +205,12 @@ std::shared_ptr<DOMNode> HTMLParser::parse(const std::string& html) {
 
             std::string value;
             if (aPos < aLen && attrRemainder[aPos] == '=') {
-                aPos++; // Skip '='
+                aPos++;
                 while (aPos < aLen && std::isspace(static_cast<unsigned char>(attrRemainder[aPos]))) aPos++;
                 if (aPos < aLen) {
                     char quote = attrRemainder[aPos];
                     if (quote == '"' || quote == '\'') {
-                        aPos++; // Skip quote
+                        aPos++;
                         size_t valStart = aPos;
                         while (aPos < aLen && attrRemainder[aPos] != quote) aPos++;
                         value = attrRemainder.substr(valStart, aPos - valStart);
@@ -222,7 +225,7 @@ std::shared_ptr<DOMNode> HTMLParser::parse(const std::string& html) {
             elem->setAttribute(key, decodeEntities(value));
         }
 
-        // Check if script or style - we can skip script content
+        // Skip script
         if (tagName == "script") {
             size_t scriptEnd = html.find("</script>", pos);
             if (scriptEnd != std::string::npos) {
@@ -231,16 +234,15 @@ std::shared_ptr<DOMNode> HTMLParser::parse(const std::string& html) {
                 size_t scriptEndCap = html.find("</SCRIPT>", pos);
                 if (scriptEndCap != std::string::npos) pos = scriptEndCap + 9;
             }
-            continue; // Do not add script node to DOM
+            continue;
         }
 
-        // Add to parent
         elem->parent = nodeStack.top();
         nodeStack.top()->addChild(elem);
 
-        // Check if void tag
-        if (voidTags.count(tagName) > 0 || selfClosing) {
-            // Do not push to stack
+        // Check if void tag or exceeds MAX_DOM_DEPTH (recursion guard)
+        if (voidTags.count(tagName) > 0 || selfClosing || nodeStack.size() >= MAX_DOM_DEPTH) {
+            // Do not push to stack to prevent deep nesting stack overflows
         } else {
             nodeStack.push(elem);
         }
