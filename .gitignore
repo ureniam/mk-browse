@@ -1,0 +1,10 @@
+# Build outputs
+*.o
+mk-browse
+build/
+dist/
+
+# System & IDE
+.DS_Store
+.vscode/
+.idea/
