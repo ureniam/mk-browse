@@ -9,7 +9,9 @@ SRC = src/main.cpp \
       src/renderer.cpp \
       src/network.cpp \
       src/browser_tab.cpp \
-      src/main_window.cpp
+      src/main_window.cpp \
+      src/gfx_search_box.cpp \
+      src/gfx_canvas.cpp
 
 OBJ = $(SRC:.cpp=.o)
 TARGET = mk-browse
@@ -18,7 +20,7 @@ all: $(TARGET)
 
 $(TARGET): $(OBJ)
 	$(CXX) $(OBJ) -o $(TARGET) $(LDFLAGS)
-	@echo "✓ Successfully built $(TARGET)"
+	@echo "✓ Successfully built $(TARGET) with MCP-generated GFX & Search engine"
 
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
@@ -27,8 +29,8 @@ test: $(TARGET)
 	@echo "→ Running Headless Engine Tests..."
 	./$(TARGET) --test about:home
 	./$(TARGET) --test about:mkcorpo
-	@echo "→ Running Virtual X11 GUI Test via xvfb-run..."
-	xvfb-run -a timeout 3 ./$(TARGET) about:home || true
+	@echo "→ Verifying Real Web Fetching..."
+	./$(TARGET) --test https://news.ycombinator.com
 	@echo "✓ All tests verified successfully!"
 
 clean:

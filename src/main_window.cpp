@@ -47,19 +47,6 @@ void MainWindow::setupStyles() {
             background-color: #0284c7;
             border-color: #38bdf8;
         }
-        .url-bar {
-            background-color: #0f172a;
-            color: #38bdf8;
-            border: 1px solid #334155;
-            border-radius: 6px;
-            padding: 4px 12px;
-            font-family: monospace;
-            font-size: 13px;
-        }
-        .url-bar:focus {
-            border-color: #0284c7;
-            background-color: #1e293b;
-        }
         .bookmark-bar {
             background-color: #1e293b;
             padding: 3px 10px;
@@ -109,7 +96,7 @@ void MainWindow::setupStyles() {
 
 void MainWindow::setupUi() {
     window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
-    gtk_window_set_title(GTK_WINDOW(window), "MK-Browse | MKCorpo Lightweight Engine");
+    gtk_window_set_title(GTK_WINDOW(window), "MK-Browse | MKCorpo Low-RAM Browser");
     gtk_window_set_default_size(GTK_WINDOW(window), 1080, 720);
 
     // Set Window Icon from MKCorpo logo
@@ -139,7 +126,7 @@ void MainWindow::setupUi() {
     gtk_style_context_add_class(gtk_widget_get_style_context(toolbar), "header-bar");
     gtk_box_pack_start(GTK_BOX(mainBox), toolbar, FALSE, FALSE, 0);
 
-    // Brand Badge with small icon
+    // Brand Badge with MKCorpo icon
     GtkWidget* brandBox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
     GdkPixbuf* smallLogo = gdk_pixbuf_new_from_file_at_scale(
         "/home/ubuntu/mk-browse/assets/mkcorpo_favicon.png", 22, 22, TRUE, nullptr
@@ -150,8 +137,6 @@ void MainWindow::setupUi() {
         g_object_unref(smallLogo);
     }
     GtkWidget* brandLabel = gtk_label_new("MK-Browse");
-    GtkStyleContext* brandCtx = gtk_widget_get_style_context(brandLabel);
-    gtk_style_context_add_class(brandCtx, "brand-label");
     gtk_box_pack_start(GTK_BOX(brandBox), brandLabel, FALSE, FALSE, 4);
     gtk_box_pack_start(GTK_BOX(toolbar), brandBox, FALSE, FALSE, 4);
 
@@ -176,12 +161,15 @@ void MainWindow::setupUi() {
     g_signal_connect(btnHome, "clicked", G_CALLBACK(onHomeClicked), this);
     gtk_box_pack_start(GTK_BOX(toolbar), btnHome, FALSE, FALSE, 0);
 
-    // URL Entry
-    urlEntry = gtk_entry_new();
-    gtk_style_context_add_class(gtk_widget_get_style_context(urlEntry), "url-bar");
-    gtk_entry_set_placeholder_text(GTK_ENTRY(urlEntry), "Enter URL or DuckDuckGo search query...");
-    g_signal_connect(urlEntry, "activate", G_CALLBACK(onEntryActivate), this);
-    gtk_box_pack_start(GTK_BOX(toolbar), urlEntry, TRUE, TRUE, 4);
+    // GfxSearchBox written by MCP Model
+    searchBox = std::make_unique<GfxSearchBox>(
+        "Search web with DuckDuckGo or enter URL...",
+        [this](const std::string& targetUrl) {
+            auto tab = getCurrentTab();
+            if (tab) tab->loadUrl(targetUrl);
+        }
+    );
+    gtk_box_pack_start(GTK_BOX(toolbar), searchBox->widget(), TRUE, TRUE, 4);
 
     btnGo = gtk_button_new_with_label("Go");
     gtk_style_context_add_class(gtk_widget_get_style_context(btnGo), "nav-btn");
@@ -276,7 +264,7 @@ void MainWindow::createNewTab(const std::string& url) {
     };
 
     tab->onNavigateCallback = [this](const std::string& newUrl) {
-        gtk_entry_set_text(GTK_ENTRY(urlEntry), newUrl.c_str());
+        if (searchBox) searchBox->setText(newUrl);
         updateNavButtons();
     };
 
@@ -300,7 +288,6 @@ void MainWindow::createNewTab(const std::string& url) {
 
 void MainWindow::closeTab(int index) {
     if (tabs.size() <= 1) {
-        // Don't close last tab, just reset to home
         tabs[0]->loadUrl("about:home");
         return;
     }
@@ -329,7 +316,7 @@ void MainWindow::updateNavButtons() {
 void MainWindow::updateMemoryUsage() {
     double mb = getMemoryRssMb();
     std::stringstream ss;
-    ss << std::fixed << std::setprecision(1) << "RAM: " << mb << " MB (UltraLight)";
+    ss << std::fixed << std::setprecision(1) << "RAM: " << mb << " MB (Low-Spec Target: 50-100MB)";
     gtk_label_set_text(GTK_LABEL(memLabel), ss.str().c_str());
 }
 
@@ -362,59 +349,61 @@ void MainWindow::showSourceViewer() {
     g_signal_connect(dialog, "response", G_CALLBACK(gtk_widget_destroy), nullptr);
 }
 
-void MainWindow::onEntryActivate(GtkEntry* entry, gpointer userData) {
-    MainWindow* w = static_cast<MainWindow*>(userData);
-    const char* text = gtk_entry_get_text(entry);
-    auto tab = w->getCurrentTab();
-    if (tab && text) tab->loadUrl(text);
-}
-
 void MainWindow::onBackClicked(GtkButton* btn, gpointer userData) {
+    (void)btn;
     MainWindow* w = static_cast<MainWindow*>(userData);
     auto tab = w->getCurrentTab();
     if (tab) tab->goBack();
 }
 
 void MainWindow::onForwardClicked(GtkButton* btn, gpointer userData) {
+    (void)btn;
     MainWindow* w = static_cast<MainWindow*>(userData);
     auto tab = w->getCurrentTab();
     if (tab) tab->goForward();
 }
 
 void MainWindow::onReloadClicked(GtkButton* btn, gpointer userData) {
+    (void)btn;
     MainWindow* w = static_cast<MainWindow*>(userData);
     auto tab = w->getCurrentTab();
     if (tab) tab->reload();
 }
 
 void MainWindow::onHomeClicked(GtkButton* btn, gpointer userData) {
+    (void)btn;
     MainWindow* w = static_cast<MainWindow*>(userData);
     auto tab = w->getCurrentTab();
     if (tab) tab->loadUrl("about:home");
 }
 
 void MainWindow::onGoClicked(GtkButton* btn, gpointer userData) {
+    (void)btn;
     MainWindow* w = static_cast<MainWindow*>(userData);
-    const char* text = gtk_entry_get_text(GTK_ENTRY(w->urlEntry));
+    if (!w->searchBox) return;
+    std::string text = w->searchBox->getText();
     auto tab = w->getCurrentTab();
-    if (tab && text) tab->loadUrl(text);
+    if (tab && !text.empty()) tab->loadUrl(text);
 }
 
 void MainWindow::onNewTabClicked(GtkButton* btn, gpointer userData) {
+    (void)btn;
     MainWindow* w = static_cast<MainWindow*>(userData);
     w->createNewTab("about:home");
 }
 
 void MainWindow::onViewSourceClicked(GtkButton* btn, gpointer userData) {
+    (void)btn;
     MainWindow* w = static_cast<MainWindow*>(userData);
     w->showSourceViewer();
 }
 
 void MainWindow::onNotebookSwitchPage(GtkNotebook* nb, GtkWidget* page, guint pageNum, gpointer userData) {
+    (void)nb; (void)page;
     MainWindow* w = static_cast<MainWindow*>(userData);
     if (pageNum < w->tabs.size()) {
         auto tab = w->tabs[pageNum];
-        gtk_entry_set_text(GTK_ENTRY(w->urlEntry), tab->currentUrl.c_str());
+        if (w->searchBox) w->searchBox->setText(tab->currentUrl);
         gtk_window_set_title(GTK_WINDOW(w->window), (tab->pageTitle + " - MK-Browse (MKCorpo)").c_str());
         w->updateNavButtons();
     }
@@ -423,5 +412,5 @@ void MainWindow::onNotebookSwitchPage(GtkNotebook* nb, GtkWidget* page, guint pa
 gboolean MainWindow::onMemTimer(gpointer userData) {
     MainWindow* w = static_cast<MainWindow*>(userData);
     w->updateMemoryUsage();
-    return TRUE; // keep timer running
+    return TRUE;
 }

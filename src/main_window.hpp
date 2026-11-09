@@ -1,5 +1,6 @@
 #pragma once
 #include "browser_tab.hpp"
+#include "gfx_search_box.hpp"
 #include <gtk/gtk.h>
 #include <vector>
 #include <memory>
@@ -21,7 +22,7 @@ public:
     GtkWidget* btnForward = nullptr;
     GtkWidget* btnReload = nullptr;
     GtkWidget* btnHome = nullptr;
-    GtkWidget* urlEntry = nullptr;
+    std::unique_ptr<GfxSearchBox> searchBox;
     GtkWidget* btnGo = nullptr;
     GtkWidget* btnNewTab = nullptr;
     GtkWidget* btnViewSource = nullptr;
@@ -44,7 +45,6 @@ private:
     void showSourceViewer();
 
     // Callbacks
-    static void onEntryActivate(GtkEntry* entry, gpointer userData);
     static void onBackClicked(GtkButton* btn, gpointer userData);
     static void onForwardClicked(GtkButton* btn, gpointer userData);
     static void onReloadClicked(GtkButton* btn, gpointer userData);
